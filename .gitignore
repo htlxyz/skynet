@@ -9,3 +9,14 @@
 *.so
 *.dSYM
 .DS_Store
+
+#source insight
+*.IAB
+*.IAD
+*.IMB
+*.IMD
+*.PFI
+*.PO
+*.PR
+*.PRI
+*.PS
