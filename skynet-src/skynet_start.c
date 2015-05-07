@@ -211,26 +211,37 @@ bootstrap(struct skynet_context * logger, const char * cmdline) {
 
 void 
 skynet_start(struct skynet_config * config) {
+	//配置了pid,就创建守程进程文件
+	//配置中的进程号已存在，不是当前的进程号就结束以前，把当前的进程号写入
 	if (config->daemon) {
 		if (daemon_init(config->daemon)) {
 			exit(1);
 		}
 	}
+	//组合结点初始化
 	skynet_harbor_init(config->harbor);
+	//全局handler结构体的初始化
 	skynet_handle_init(config->harbor);
+	//全局的根消息排队实始化
 	skynet_mq_init();
+	//模块化根结点
 	skynet_module_init(config->module_path);
+	//timer结构体的初始化
 	skynet_timer_init();
+	//socket初始化
 	skynet_socket_init();
 
+	//创建logger模块
 	struct skynet_context *ctx = skynet_context_new("logger", config->logger);
 	if (ctx == NULL) {
 		fprintf(stderr, "Can't launch logger service\n");
 		exit(1);
 	}
 
+	//创建引导模块
 	bootstrap(ctx, config->bootstrap);
 
+	//启动工作线程
 	_start(config->thread);
 
 	// harbor_exit may call socket send, so it should exit before socket_free

@@ -20,6 +20,14 @@ typedef void (*timer_execute_func)(void *ud,void *arg);
 #define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
 #define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
+//这里的timer是把秒数分成了五个部分，距当前时间越近，分得越精细
+// |31--25--19--13--7--0|  
+//     6   6   6   6  8
+//前面四个6字节存在link_list t中
+//后面8字节存在near中，距当前时间更近了，应该分得更细些
+//这里用的法则与linux里的timer实现原理相同
+//当前timer精确到0.01秒
+
 #define TIME_NEAR_SHIFT 8
 #define TIME_NEAR (1 << TIME_NEAR_SHIFT)
 #define TIME_LEVEL_SHIFT 6
@@ -77,8 +85,10 @@ add_node(struct timer *T,struct timer_node *node) {
 	uint32_t current_time=T->time;
 	
 	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {
+		//如果前面的24个字节，都一样
 		link(&T->near[time&TIME_NEAR_MASK],node);
 	} else {
+		//距当前时间还远，应该存到t[4]中
 		int i;
 		uint32_t mask=TIME_NEAR << TIME_LEVEL_SHIFT;
 		for (i=0;i<3;i++) {
@@ -94,6 +104,7 @@ add_node(struct timer *T,struct timer_node *node) {
 
 static void
 timer_add(struct timer *T,void *arg,size_t sz,int time) {
+	//这里要注意，timer对应的参数是和timer_node这个结构体一起分配的
 	struct timer_node *node = (struct timer_node *)skynet_malloc(sizeof(*node)+sz);
 	memcpy(node+1,arg,sz);
 
@@ -105,6 +116,7 @@ timer_add(struct timer *T,void *arg,size_t sz,int time) {
 	UNLOCK(T);
 }
 
+//这里把远的时间，重新加到节点中，这时相当于会加到近的near中了，在add_node中会作调整
 static void
 move_list(struct timer *T, int level, int idx) {
 	struct timer_node *current = link_clear(&T->t[level][idx]);
